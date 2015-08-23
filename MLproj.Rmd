@@ -1,0 +1,85 @@
+---
+title: "Predicting Exercise Activity Quality Using Accelerometer Data"
+author: "Neil Patel"
+date: "August 22, 2015"
+output: html_document
+---
+
+#Preparing Data
+```
+setwd("C:/Users/Neil/SkyDrive/DataScience/MachineLearning")
+
+#### Reading in data ####
+trainurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-training.csv"
+dest.training <- "data.training.csv"
+testurl <- "https://d396qusza40orc.cloudfront.net/predmachlearn/pml-testing.csv"
+dest.testing <- "data.testing.csv"
+download.file(trainurl,dest.training); download.file(testurl,dest.testing)
+
+data <- read.csv("data.training.csv", na.strings = c("NA", ""))
+#### ####
+```
+
+Now that the data is loaded in, we split the data into training and test sets.
+```
+library(caret)
+
+set.seed(0)
+inTrain <- createDataPartition(y = data$classe, p = 0.7, list = FALSE)
+training <- data[inTrain, ]
+testing <- data[-inTrain, ]
+```
+
+Looking at the dataset, there are a plethora of variables with nearly zero variance and missing values. Additionally, some variables are not useful for prediction, so we remove those.
+
+```
+## Manage variables with near zero variance
+nzv <- nearZeroVar(training)
+training <- training[, -nzv]
+testing <- testing[, -nzv]
+
+#remove variables with substantial amounts of missing values
+NAcols <- sapply(training, function(x) mean(is.na(x))) > 0.7
+training <- training[,NAcols==FALSE]
+testing <- testing[,NAcols == FALSE]
+
+#remove the first five columns
+training <- training[,-c(1:5)]
+testing <- testing[,-c(1:5)]
+```
+
+#Random Forest Model
+The first model we attempt to build will be a Random Forest. 
+
+```
+fitRF <- train(classe~., data = training, method = "rf")
+```
+
+
+```
+predRF <- predict(fitRF, newdata = testing)
+confusionMatrix(testing$classe, predRF)
+```
+
+We get an accuracy of about 99.8%, so the expected out-of-sample error is 0.2%. 
+This algorithm is accurate enough for this dataset, so we will forgo training other models.
+
+##Predicting on Test Set
+
+We now fit our model on the given test set and use the given file submission code. 
+```
+data.testing <- read.csv("data.testing.csv")
+predRF.testing <- as.character(predict(fitRF, newdata = data.testing))
+
+pml_write_files = function(x){
+    n = length(x)
+    for(i in 1:n){
+        filename = paste0("problem_id_",i,".txt")
+        write.table(x[i],file=filename,quote=FALSE,row.names=FALSE,col.names=FALSE)
+    }
+}
+
+setwd("C:/Users/Neil/SkyDrive/DataScience/MachineLearning/submitFiles")
+
+pml_write_files(predRF.testing)
+```
